@@ -81,6 +81,7 @@ async def on_message(message):
         embed.add_field(name="liss.help", value="コマンドリスト")
         embed.add_field(name="liss.time", value="経過時間")
         embed.add_field(name="ども", value="あいさつ")
+        embed.add_field(name="liss.code", value="ソースコード")
         await message.channel.send(embed=embed)
     #あいさつ
     if message.content.startswith("ども"):
@@ -102,8 +103,12 @@ async def on_message(message):
             icon_url=message.author.avatar_url_as(size=64)
         )
         await message.channel.send(embed=embed)
-            
-            
+    #liss.code
+    if message.content.startswith("liss.code"):
+        m = "プログラムリサンドラのプログラムはこちら.\n"
+        m += "https://github.com/kiahi39/discord_app/blob/master/lissandra.py"
+        await message.channel.send(m)
+        
 
 
 def cal_timedelta(pretime):
