@@ -12,9 +12,9 @@ def get_connection():
     dsn = os.environ.get('DATABASE_URL')
     return psycopg2.connect(dsn)
 
-bot = commands.Bot(command_prefix='$')
+client = commands.Bot(command_prefix='$')
 
-client = discord.Client()
+#client = discord.Client()
 pretime_dict = {}
 
 reply_channel_name = "lissandra"
@@ -26,7 +26,7 @@ text = []
 async def test(ctx, arg):
     await ctx.send(arg)
 
-bot.add_command(test)
+client.add_command(test)
 
 
 @client.event
@@ -91,6 +91,8 @@ async def on_voice_state_update(member, before, after):
 
 @client.event
 async def on_message(message):
+    if message.author == client.user:
+        return
     #help
     if message.content.startswith("liss.help"):
         embed = discord.Embed(color=0x30DADD)
@@ -98,14 +100,14 @@ async def on_message(message):
         embed.add_field(name="liss.time", value="経過時間")
         embed.add_field(name="ども", value="あいさつ")
         embed.add_field(name="liss.code", value="ソースコード")
-        embed.add_field(name="例「liss.addtext {0}が{1}通話.」", value="通話終了テキストを追加.")
-        embed.add_field(name="liss.textlist", value="通話終了テキストのリスト")
+        embed.add_field(name="例「liss.addtext {0}が{1}通話.」", value="テキストを追加.")
+        embed.add_field(name="liss.textlist", value="テキストのリスト")
+        embed.add_field(name="liss.deltext", value="テキストの削除（IDを指定）")
         await message.channel.send(embed=embed)
     #あいさつ
     if message.content.startswith("ども"):
-        if client.user != message.author:
-            m = "ハロー、" + message.author.name + "！"
-            await message.channel.send(m)
+        m = "ハロー、" + message.author.name + "！"
+        await message.channel.send(m)
     #経過時間 liss.time
     if message.content == "liss.time":
         if message.author.name in pretime_dict:
@@ -159,6 +161,7 @@ async def on_message(message):
                     text.remove(row[0])
                 cur.execute('DELETE FROM LissText WHERE id = %s;', (m, )) 
         await message.channel.send("削除 ID:"+m)
+    await client.process_commands(message)
 
 
 def cal_timedelta(pretime):
