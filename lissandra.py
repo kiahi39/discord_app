@@ -11,38 +11,30 @@ import hashlib
 import urllib.request as urllib2
 import json
 
-def getSummID(sumname):
-    SUMMONER_V4 = "https://jp1.api.riotgames.com/lol/summoner/v4/summoners/by-name/"
-    #apikey = os.environ.get('RIOT_API_KEY')
-    RIOT_API_KEY = "api_key=RGAPI-40fd9035-9dd4-4e6a-82d6-6ee86fde5d71"
-    try:
-        s1 = urllib2.urlopen(SUMMONER_V4 + sumname + '?' + RIOT_API_KEY)
-        summ = json.loads(s1.read().decode('utf-8'))
-        SUM_ID = summ["id"]
-        print(summ)
-        
-    finally:
-        s1.close()
-        return SUM_ID
+import riotapi
+
+client = commands.Bot(command_prefix='!')
+#client = discord.Client()
+pretime_dict = {}
+reply_channel_name = "lissandra"
+text = []
 
 def get_connection():
     dsn = os.environ.get('DATABASE_URL')
     return psycopg2.connect(dsn)
 
-client = commands.Bot(command_prefix='!')
-
-#client = discord.Client()
-pretime_dict = {}
-
-reply_channel_name = "lissandra"
-
-text = []
-
-
+#getwards
 @client.command()
-async def sumid(ctx, arg):
-    m = getSummID(str(arg))
-    await ctx.send(m)
+async def getwards(ctx, name):
+    aId = riotapi.getAccountID(name)
+    w = riotapi.getWards(summonerName = name, accountId=aId)
+    await ctx.send("買ったコントロールワード："+ str(w))
+
+#a369852 
+@client.command()
+async def a369852(ctx, name, time):
+    pretime_dict[str(name)] = datetime.datetime.now() - datetime.timedelta(seconds = int(time))
+    await ctx.send("はーい.")
 
 @client.event
 async def on_ready():
@@ -58,7 +50,6 @@ async def on_ready():
 
 @client.event
 async def on_voice_state_update(member, before, after):
-
     if(before.channel is None):
         pretime_dict[member.name] = datetime.datetime.now()
     elif(after.channel is None):
@@ -67,9 +58,7 @@ async def on_voice_state_update(member, before, after):
         str_td = timedelta_to_HM(duration_time)
         
         reply_channel = [channel for channel in before.channel.guild.channels if channel.name == reply_channel_name][0]
-
         reply_text = random.choice(text).format(member.name, str_td)
-
         embed = discord.Embed(color=0x30DADD)
         embed.set_author(name=member.name, icon_url=member.avatar_url_as(size=32))
         embed.add_field(
@@ -77,7 +66,6 @@ async def on_voice_state_update(member, before, after):
             value=before.channel.name + "　|　" + before.channel.category.name, 
             inline=False
         )
-
         #if duration_time >= datetime.timedelta(0, 60):
         await reply_channel.send(embed=embed)
 
@@ -154,7 +142,7 @@ async def on_message(message):
                 cur.execute('DELETE FROM LissText WHERE id = %s;', (m, )) 
         await message.channel.send("削除 ID:"+m)
     await client.process_commands(message)
-
+    
 def cal_timedelta(pretime):
     return datetime.datetime.now() - pretime
 
