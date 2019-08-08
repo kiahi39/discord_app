@@ -8,11 +8,28 @@ import os
 import psycopg2
 import hashlib
 
+import urllib.request as urllib2
+import json
+
+def getSummID(sumname):
+    SUMMONER_V4 = "https://jp1.api.riotgames.com/lol/summoner/v4/summoners/by-name/"
+    #apikey = os.environ.get('RIOT_API_KEY')
+    RIOT_API_KEY = "api_key=RGAPI-40fd9035-9dd4-4e6a-82d6-6ee86fde5d71"
+    try:
+        s1 = urllib2.urlopen(SUMMONER_V4 + sumname + '?' + RIOT_API_KEY)
+        summ = json.loads(s1.read().decode('utf-8'))
+        SUM_ID = summ["id"]
+        print(summ)
+        
+    finally:
+        s1.close()
+        return SUM_ID
+
 def get_connection():
     dsn = os.environ.get('DATABASE_URL')
     return psycopg2.connect(dsn)
 
-client = commands.Bot(command_prefix='$')
+client = commands.Bot(command_prefix='!')
 
 #client = discord.Client()
 pretime_dict = {}
@@ -22,12 +39,10 @@ reply_channel_name = "lissandra"
 text = []
 
 
-@commands.command()
-async def test(ctx, arg):
-    await ctx.send(arg)
-
-client.add_command(test)
-
+@client.command()
+async def sumid(ctx, arg):
+    m = getSummID(str(arg))
+    await ctx.send(m)
 
 @client.event
 async def on_ready():
@@ -39,9 +54,7 @@ async def on_ready():
         with conn.cursor() as cur:
             cur.execute('SELECT content FROM LissText')
             for row in cur:
-                print(row)
                 text.append(row[0])
-
 
 @client.event
 async def on_voice_state_update(member, before, after):
@@ -53,26 +66,7 @@ async def on_voice_state_update(member, before, after):
         pretime_dict.pop(member.name)
         str_td = timedelta_to_HM(duration_time)
         
-
-        reply_channel = [
-            channel for channel in before.channel.guild.channels if channel.name == reply_channel_name][0]
-
-        '''
-        text = [
-            "{0}は{1}の間 氷漬けにされていました.",
-            "{0}は{1}間ずっと狂ったようにモンスターを狩り続けていました.",
-            "{0}は{1}の時間を有意義に過ごしました.",
-            "{0}は{1}間の記憶がないようです.",
-            "{0}は{1}前まで元気でした.",
-            "{0}は右クリックを夢中で押していただけなのに{1}が経過していました.",
-            "{0}は睡眠時間を{1}失いました.",
-            "{0}は{1} なにも食べていません.",
-            "{0}が静かになるまで{1}かかりました.",
-            "{0}は{1}も勉強してえらい.",
-            "{0}が{1}ずっと部屋から出てきません.",
-            
-        ]
-        '''
+        reply_channel = [channel for channel in before.channel.guild.channels if channel.name == reply_channel_name][0]
 
         reply_text = random.choice(text).format(member.name, str_td)
 
@@ -84,10 +78,8 @@ async def on_voice_state_update(member, before, after):
             inline=False
         )
 
-
         #if duration_time >= datetime.timedelta(0, 60):
         await reply_channel.send(embed=embed)
-
 
 @client.event
 async def on_message(message):
@@ -163,7 +155,6 @@ async def on_message(message):
         await message.channel.send("削除 ID:"+m)
     await client.process_commands(message)
 
-
 def cal_timedelta(pretime):
     return datetime.datetime.now() - pretime
 
@@ -186,6 +177,5 @@ def hash4(dat):
     hs = hashlib.md5(dat.encode()).hexdigest()
     hs = hs[:4]
     return hs
-
 
 client.run("token")
