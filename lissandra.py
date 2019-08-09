@@ -11,24 +11,100 @@ import hashlib
 import urllib.request as urllib2
 import json
 
-import riotapi
+#import jaconv
 
-client = commands.Bot(command_prefix='!')
+import riotapi
+import database as db
+
+client = commands.Bot(command_prefix='liss.')
 #client = discord.Client()
 pretime_dict = {}
 reply_channel_name = "lissandra"
 text = []
+logintime_dict = {}
+PATCH = "9.15"
 
-def get_connection():
-    dsn = os.environ.get('DATABASE_URL')
-    return psycopg2.connect(dsn)
+#login
+@client.command()
+async def login(ctx, *_sname):
+    map_result = map(str, _sname)
+    sname = ' '.join(map_result)
+    summoner = riotapi.getSummoner(sname)
+    userName = ctx.message.author.name
 
+    with db.get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute('SELECT summoner_name FROM LissWard WHERE discord_id = %s;', (str(ctx.message.author.id), ))
+            sn = "null"
+            for summoner_name in cur:
+                sn = summoner_name[0]
+            if sn != summoner["name"]:
+                cur.execute('DELETE FROM LissWard WHERE discord_id = %s;', (str(ctx.message.author.id), ))
+                cur.execute('INSERT INTO LissWard (discord_id, summoner_name) VALUES (%s, %s)', (ctx.message.author.id, summoner['name']))
+                loginText = "登録しました."
+            else:
+                loginText = "ログイン済みです."
+        conn.commit()
+    embed = discord.Embed(color=0x30DADD)
+    embed.set_author(name=userName, icon_url=ctx.message.author.avatar_url_as(size=32))
+    embed.set_thumbnail(url="http://ddragon.leagueoflegends.com/cdn/{0}.1/img/profileicon/{1}.png".format(PATCH, summoner['profileIconId']))
+    embed.add_field(
+        name="サモナーネーム："+summoner['name']+"　"+ loginText,
+        value="サモナーレベル："+ str(summoner['summonerLevel']),
+    )
+    await ctx.send(embed=embed)
+        
 #getwards
 @client.command()
-async def getwards(ctx, name):
-    aId = riotapi.getAccountID(name)
-    w = riotapi.getWards(summonerName = name, accountId=aId)
-    await ctx.send("買ったコントロールワード："+ str(w))
+async def ward(ctx):
+    discordId = str(ctx.message.author.id)
+    with db.get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute('SELECT summoner_name FROM LissWard WHERE discord_id=%s;', (str(discordId), ))
+            for sn in cur:
+                sname = sn[0]
+            aId = riotapi.getAccountID(sname)
+            lastMatchId = riotapi.getLastMatch(accountId = aId)
+            par = riotapi.getParticipant(summoner_name=sname, matchId=lastMatchId)
+            wards = par['stats']['visionWardsBoughtInGame']
+            #wards = jaconv.h2z(str(wards),digit=True)
+            k = str(par['stats']['kills'])
+            d = str(par['stats']['deaths'])
+            a = str(par['stats']['assists'])
+            wintext = ""
+            doubletext = ""
+            if par['stats']['win']:
+                wintext = "勝ったのですね！"
+                double = 2
+                doubletext = "２倍の"
+            else:
+                double = 1
+                wintext = "負けたのですね."
+            cur.execute('SELECT last_match_id FROM LissWard WHERE discord_id=%s;', (str(discordId), ))
+            for last_match_id in cur:
+                if(last_match_id[0] != str(lastMatchId)):
+                    cur.execute('UPDATE LissWard Set last_match_id=%s WHERE discord_id=%s;', (str(lastMatchId), str(discordId)))
+                    cur.execute('UPDATE LissWard Set wards = wards+%s WHERE discord_id=%s;', (int(wards)*double, str(discordId)))
+                    wardText = "コントロールワードを"+doubletext+" "+ str(wards*double) +"個 受領しました ."
+                else:
+                    wardText = "コントロールワードを"+doubletext+" "+ str(wards*double) +"個 既に受領済みです ."
+                cur.execute('SELECT wards FROM LissWard WHERE discord_id=%s;', (str(discordId), ))
+                for w in cur:
+                    totalWard = w
+        conn.commit()
+    embed = discord.Embed(color=0x30DADD)
+    embed.set_author(name=sname +"　KDA："+k+"/"+d+"/"+a, icon_url=riotapi.getSquareChampion(par['championId']))
+    embed.add_field(
+        name=wintext +"　/　"+ wardText,
+        value="累計 ： %s 個" % totalWard
+    )
+    await ctx.send(embed=embed)
+
+#sumlevel
+@client.command()
+async def level(ctx, name):
+    sl = riotapi.getSummLevel(name)
+    await ctx.send(str(name)+"のサモナーレベルは,"+str(sl)+"です.")
 
 #a369852 
 @client.command()
@@ -42,16 +118,18 @@ async def on_ready():
     print(client.user.name)
     print(client.user.id)
     print('------')
-    with get_connection() as conn:
+    with db.get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute('SELECT content FROM LissText')
             for row in cur:
                 text.append(row[0])
 
+#通話時間計測 : 通話開始時間を保持しておく仕組み
 @client.event
 async def on_voice_state_update(member, before, after):
     if(before.channel is None):
         pretime_dict[member.name] = datetime.datetime.now()
+        #db.insert('INSERT INTO LissText (id, content) VALUES (%s, %s)', (member.id))
     elif(after.channel is None):
         duration_time = cal_timedelta(pretime_dict[member.name])
         pretime_dict.pop(member.name)
@@ -80,9 +158,11 @@ async def on_message(message):
         embed.add_field(name="liss.time", value="経過時間")
         embed.add_field(name="ども", value="あいさつ")
         embed.add_field(name="liss.code", value="ソースコード")
-        embed.add_field(name="例「liss.addtext {0}が{1}通話.」", value="テキストを追加.")
+        embed.add_field(name="liss.addtext (文章)", value="テキストを追加")
         embed.add_field(name="liss.textlist", value="テキストのリスト")
         embed.add_field(name="liss.deltext", value="テキストの削除（IDを指定）")
+        embed.add_field(name="liss.login (サモナーネーム)", value="サモナーネームを登録")
+        embed.add_field(name="liss.ward", value="リサンドラにワードをあげる")
         await message.channel.send(embed=embed)
     #あいさつ
     if message.content.startswith("ども"):
@@ -113,19 +193,16 @@ async def on_message(message):
         m = message.content
         m = m.replace("liss.addtext ", "")
         if ("{0}"in m) and ("{1}"in m):
-            with get_connection() as conn:
-                with conn.cursor() as cur:
-                    id0 = hash4(datetime.datetime.now().strftime('%Y/%m/%d/%H:%M:%S'))
-                    cur.execute('INSERT INTO LissText (id, content) VALUES (%s, %s)', (id0, m))
-                    text.append(m)
-                conn.commit()
+            id0 = hash4(datetime.datetime.now().strftime('%Y/%m/%d/%H:%M:%S'))
+            db.insert('INSERT INTO LissText (id, content) VALUES (%s, %s)', (id0, m))
+            text.append(m)
             await message.channel.send("テキストを追加.id: "+ id0 +"「"+ m +"」")
         else:
             await message.channel.send("{0}と{1}が含まれていません.")
 
     #liss.textlist
     if message.content.startswith("liss.textlist"):
-        with get_connection() as conn:
+        with db.get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute('SELECT * FROM LissText')
                 for row in cur:
@@ -134,7 +211,7 @@ async def on_message(message):
     if message.content.startswith("liss.deltext "):
         m = message.content
         m = m.replace("liss.deltext ", "")
-        with get_connection() as conn:
+        with db.get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute('SELECT content FROM LissText WHERE id = %s;', (m, ))
                 for row in cur:
@@ -146,8 +223,8 @@ async def on_message(message):
 def cal_timedelta(pretime):
     return datetime.datetime.now() - pretime
 
-def timedelta_to_HM(td, contain_seconds=False):
-    sec = td.total_seconds()
+def timedelta_to_HM(timedelta, contain_seconds=False):
+    sec = timedelta
     hour = sec // 3600
     minute = sec%3600 // 60
     
