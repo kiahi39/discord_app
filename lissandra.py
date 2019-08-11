@@ -64,6 +64,8 @@ async def ward(ctx):
             for sn in cur:
                 sname = sn[0]
             aId = riotapi.getAccountID(sname)
+            if(aId == "null"):
+                await ctx.send("RiotAPIキーの有効期限が切れています。更新して！@39cmさん！")
             lastMatchId = riotapi.getLastMatch(accountId = aId)
             par = riotapi.getParticipant(summoner_name=sname, matchId=lastMatchId)
             wards = par['stats']['visionWardsBoughtInGame']
