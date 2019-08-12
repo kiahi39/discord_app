@@ -226,7 +226,7 @@ def cal_timedelta(pretime):
     return datetime.datetime.now() - pretime
 
 def timedelta_to_HM(timedelta, contain_seconds=False):
-    sec = timedelta
+    sec = timedelta.total_seconds()
     hour = sec // 3600
     minute = sec%3600 // 60
     
