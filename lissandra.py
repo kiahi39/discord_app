@@ -224,7 +224,7 @@ def cal_timedelta(pretime):
     return datetime.datetime.now() - pretime
 
 def timedelta_to_HM(timedelta, contain_seconds=False):
-    sec = timedelta
+    sec = timedelta.total_seconds()
     hour = sec // 3600
     minute = sec%3600 // 60
     
@@ -243,4 +243,4 @@ def hash4(dat):
     hs = hs[:4]
     return hs
 
-client.run("token")
+client.run("NjA2ODkzODc4MDA3ODI0NDIx.XU4-gw.PkjTqJ-KcrPo_5cBgo1kYfO_WQk")
