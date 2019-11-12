@@ -245,4 +245,4 @@ def hash4(dat):
     hs = hs[:4]
     return hs
 
-client.run("NjA2ODkzODc4MDA3ODI0NDIx.XU4-gw.PkjTqJ-KcrPo_5cBgo1kYfO_WQk")
+client.run("token")
