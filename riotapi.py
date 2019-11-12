@@ -7,13 +7,17 @@ from datetime import datetime
 def getSummoner(sumname):
     SUMMONER_V4 = "https://jp1.api.riotgames.com/lol/summoner/v4/summoners/by-name/"
     rak = os.environ.get('RIOT_API_KEY')
+    s1 = "null"
     try:
         str1 = urllib.parse.quote(sumname)
         s1 = urllib2.urlopen(SUMMONER_V4 + str1 + '?api_key=' + rak)
         summ = json.loads(s1.read().decode('utf-8'))
     finally:
         s1.close()
-        return summ
+        if s1 != "null":
+            return summ
+        else:
+            return "null"
 
 def getAccountID(sumname):
     summ = getSummoner(sumname)
